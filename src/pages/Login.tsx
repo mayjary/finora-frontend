@@ -29,7 +29,7 @@ const Login = () => {
     setIsLoading(true);
     
     setTimeout(() => {
-      toast({ title: "Account created!", description: "Welcome to TradeIQ" });
+      toast({ title: "Account created!", description: "Welcome to Finora" });
       navigate("/dashboard");
       setIsLoading(false);
     }, 1000);
@@ -39,10 +39,10 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-md glass-card">
         <CardHeader className="space-y-4 text-center">
-          <img src={logo} alt="TradeIQ Logo" className="h-16 mx-auto" />
+          <img src={logo} alt="Finora Logo" className="h-16 mx-auto" />
           <div>
             <CardTitle className="text-3xl font-bold gradient-primary bg-clip-text text-transparent">
-              TradeIQ
+              Finora
             </CardTitle>
             <CardDescription>AI-Powered Trade Analytics</CardDescription>
           </div>

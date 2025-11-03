@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { LayoutDashboard, TrendingUp, BarChart3, Calculator, Newspaper, Settings, LogOut } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface LayoutProps {
   children: ReactNode;
@@ -30,11 +31,14 @@ export const Layout = ({ children }: LayoutProps) => {
     <div className="flex h-screen">
       <aside className="w-64 border-r border-border bg-card/50 backdrop-blur-sm flex flex-col">
         <div className="p-6 border-b border-border">
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="TradeIQ" className="h-10" />
-            <span className="text-xl font-bold gradient-primary bg-clip-text text-transparent">
-              TradeIQ
-            </span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img src={logo} alt="Finora" className="h-10" />
+              <span className="text-xl font-bold gradient-primary bg-clip-text text-transparent">
+                Finora
+              </span>
+            </div>
+            <ThemeToggle />
           </div>
         </div>
         
