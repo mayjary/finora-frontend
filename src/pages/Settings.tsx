@@ -8,9 +8,55 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Bell, Shield, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { UserAuth } from "@/context/AuthContext";
+import { useState } from "react";
+import { supabase } from "@/supabase-client";
 
 const Settings = () => {
   const { toast } = useToast();
+  const { session } = UserAuth();
+
+  const user = session?.user;
+  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
+  const [email, setEmail] = useState(user?.email || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+
+  const updateProfile = async () => {
+    const { error } = await supabase.auth.updateUser({
+      email,
+      data: {
+        full_name: fullName,
+      },
+    });
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+      });
+    }
+    toast({
+      title: "Success",
+      description: "Profile updated successfully",
+    });
+  }
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+  
+    if (error) {
+      toast({ title: "Password update failed", description: error.message });
+    } else {
+      toast({ title: "Password updated", description: "Your password has been changed" });
+    }
+  };
+  
 
   const handleSave = () => {
     toast({
@@ -55,18 +101,29 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" defaultValue="John Doe" />
+                <Input id="name" 
+                value={fullName} 
+                onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" defaultValue="john.doe@example.com" />
+                <Input 
+                id="email" 
+                type="email" 
+                value={email}
+                onChange={((e) => setEmail(e.target.value))} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" />
+                <Input 
+                id="phone" 
+                type="tel" 
+                value={phone}
+                onChange={((e) => setPhone(e.target.value))}
+                placeholder="+91 9876543210" />
               </div>
               <Separator />
-              <Button onClick={handleSave}>Save Changes</Button>
+              <Button onClick={updateProfile}>Save Changes</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -122,28 +179,42 @@ const Settings = () => {
               <CardDescription>Manage your account security and privacy</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" />
-              </div>
+
+              {/* new password */}
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" />
+                <Input 
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input id="confirm-password" type="password" />
+                <Input 
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
               </div>
+
               <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Two-Factor Authentication</Label>
-                  <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
-                </div>
-                <Switch />
-              </div>
-              <Separator />
-              <Button onClick={handleSave}>Update Security</Button>
+
+              <Button
+                onClick={() => {
+                  if (newPassword !== confirmPassword) {
+                    toast({ title: "Passwords do not match" });
+                    return;
+                  }
+                  updatePassword(newPassword);
+                }}
+              >
+                Update Security
+              </Button>
+
             </CardContent>
           </Card>
         </TabsContent>
