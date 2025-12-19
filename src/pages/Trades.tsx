@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,20 +7,52 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, TrendingUp, TrendingDown, Filter } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, TrendingUp, TrendingDown, Filter, Upload, FileSpreadsheet, AlertCircle, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import Papa from "papaparse";
+
+interface Trade {
+  id: number;
+  symbol: string;
+  type: "buy" | "sell";
+  quantity: number;
+  price: number;
+  exitPrice?: number;
+  date: string;
+  exitDate?: string;
+  profit: number;
+  status: "open" | "closed";
+}
+
+interface ParsedTrade {
+  symbol: string;
+  entry_price: number;
+  exit_price: number;
+  quantity: number;
+  entry_time: string;
+  exit_time: string;
+  trade_type: string;
+}
+
+const REQUIRED_COLUMNS = ["symbol", "entry_price", "exit_price", "quantity", "entry_time", "exit_time", "trade_type"];
 
 const Trades = () => {
   const { toast } = useToast();
   const [filterType, setFilterType] = useState("all");
+  const [entryMode, setEntryMode] = useState<"manual" | "csv">("manual");
+  const [isDragging, setIsDragging] = useState(false);
+  const [parsedTrades, setParsedTrades] = useState<ParsedTrade[]>([]);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [fileName, setFileName] = useState<string>("");
 
-  const trades = [
+  const [trades, setTrades] = useState<Trade[]>([
     { id: 1, symbol: "AAPL", type: "buy", quantity: 10, price: 182.50, date: "2024-01-15", profit: 250, status: "open" },
     { id: 2, symbol: "TSLA", type: "sell", quantity: 5, price: 238.75, date: "2024-01-14", profit: -120, status: "closed" },
     { id: 3, symbol: "MSFT", type: "buy", quantity: 15, price: 412.30, date: "2024-01-13", profit: 450, status: "closed" },
     { id: 4, symbol: "GOOGL", type: "buy", quantity: 8, price: 141.80, date: "2024-01-12", profit: 180, status: "open" },
     { id: 5, symbol: "AMZN", type: "sell", quantity: 12, price: 175.25, date: "2024-01-11", profit: -95, status: "closed" },
-  ];
+  ]);
 
   const handleAddTrade = () => {
     toast({
@@ -29,9 +61,126 @@ const Trades = () => {
     });
   };
 
+  const validateCSV = (data: any[]): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    
+    if (data.length === 0) {
+      errors.push("CSV file is empty");
+      return { valid: false, errors };
+    }
+
+    const headers = Object.keys(data[0]).map(h => h.toLowerCase().trim());
+    const missingColumns = REQUIRED_COLUMNS.filter(col => !headers.includes(col));
+    
+    if (missingColumns.length > 0) {
+      errors.push(`Missing required columns: ${missingColumns.join(", ")}`);
+    }
+
+    return { valid: errors.length === 0, errors };
+  };
+
+  const parseFile = (file: File) => {
+    setFileName(file.name);
+    setValidationErrors([]);
+    setParsedTrades([]);
+
+    if (file.name.endsWith(".csv")) {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const { valid, errors } = validateCSV(results.data);
+          
+          if (!valid) {
+            setValidationErrors(errors);
+            return;
+          }
+
+          const parsed: ParsedTrade[] = results.data.map((row: any) => ({
+            symbol: row.symbol?.toUpperCase() || "",
+            entry_price: parseFloat(row.entry_price) || 0,
+            exit_price: parseFloat(row.exit_price) || 0,
+            quantity: parseInt(row.quantity) || 0,
+            entry_time: row.entry_time || "",
+            exit_time: row.exit_time || "",
+            trade_type: row.trade_type?.toLowerCase() || "buy",
+          }));
+
+          setParsedTrades(parsed);
+          toast({
+            title: "File Parsed",
+            description: `Found ${parsed.length} trades in the CSV file.`,
+          });
+        },
+        error: (error) => {
+          setValidationErrors([`Error parsing file: ${error.message}`]);
+        },
+      });
+    } else if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      setValidationErrors(["Excel files (.xlsx) require additional processing. Please convert to CSV format."]);
+    } else {
+      setValidationErrors(["Unsupported file format. Please upload a .csv file."]);
+    }
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      parseFile(file);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      parseFile(file);
+    }
+  };
+
+  const handleImportTrades = () => {
+    const newTrades: Trade[] = parsedTrades.map((pt, index) => ({
+      id: trades.length + index + 1,
+      symbol: pt.symbol,
+      type: pt.trade_type as "buy" | "sell",
+      quantity: pt.quantity,
+      price: pt.entry_price,
+      exitPrice: pt.exit_price,
+      date: pt.entry_time,
+      exitDate: pt.exit_time,
+      profit: (pt.exit_price - pt.entry_price) * pt.quantity * (pt.trade_type === "buy" ? 1 : -1),
+      status: "closed" as const,
+    }));
+
+    setTrades([...trades, ...newTrades]);
+    setParsedTrades([]);
+    setFileName("");
+    
+    toast({
+      title: "Trades Imported",
+      description: `Successfully imported ${newTrades.length} trades.`,
+    });
+  };
+
   const filteredTrades = trades.filter(trade => 
     filterType === "all" ? true : trade.status === filterType
   );
+
+  const totalPnL = trades.reduce((acc, t) => acc + t.profit, 0);
+  const winningTrades = trades.filter(t => t.profit > 0).length;
+  const winRate = trades.length > 0 ? ((winningTrades / trades.length) * 100).toFixed(1) : "0";
 
   return (
     <div className="space-y-6">
@@ -47,45 +196,166 @@ const Trades = () => {
               Add Trade
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Record New Trade</DialogTitle>
-              <DialogDescription>Enter the details of your trade</DialogDescription>
+              <DialogDescription>Enter trade details manually or upload a CSV file</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="symbol">Symbol</Label>
-                <Input id="symbol" placeholder="e.g., AAPL" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type">Type</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="buy">Buy</SelectItem>
-                    <SelectItem value="sell">Sell</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input id="quantity" type="number" placeholder="0" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Price</Label>
-                <Input id="price" type="number" placeholder="0.00" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleAddTrade}>Add Trade</Button>
-            </DialogFooter>
+            
+            <Tabs value={entryMode} onValueChange={(v) => setEntryMode(v as "manual" | "csv")} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="manual" className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Manual Entry
+                </TabsTrigger>
+                <TabsTrigger value="csv" className="flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Upload CSV
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="manual" className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="symbol">Symbol</Label>
+                  <Input id="symbol" placeholder="e.g., AAPL" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="type">Type</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="buy">Buy</SelectItem>
+                      <SelectItem value="sell">Sell</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Quantity</Label>
+                  <Input id="quantity" type="number" placeholder="0" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input id="price" type="number" placeholder="0.00" />
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleAddTrade}>Add Trade</Button>
+                </DialogFooter>
+              </TabsContent>
+
+              <TabsContent value="csv" className="space-y-4 py-4">
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragging 
+                      ? "border-primary bg-primary/5" 
+                      : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-sm font-medium mb-1">
+                    {fileName ? fileName : "Drag & drop your file here"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Accepts .csv files
+                  </p>
+                  <label htmlFor="file-upload">
+                    <Button variant="outline" size="sm" asChild>
+                      <span>Browse Files</span>
+                    </Button>
+                    <input
+                      id="file-upload"
+                      type="file"
+                      accept=".csv,.xlsx,.xls"
+                      onChange={handleFileInput}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="bg-secondary/50 rounded-lg p-4">
+                  <p className="text-xs font-medium mb-2">Required CSV columns:</p>
+                  <code className="text-xs text-muted-foreground">
+                    symbol, entry_price, exit_price, quantity, entry_time, exit_time, trade_type
+                  </code>
+                </div>
+
+                {validationErrors.length > 0 && (
+                  <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                    <div className="flex items-center gap-2 text-destructive mb-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm font-medium">Validation Errors</span>
+                    </div>
+                    <ul className="text-sm text-destructive/80 list-disc list-inside">
+                      {validationErrors.map((error, i) => (
+                        <li key={i}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {parsedTrades.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-success">
+                      <Check className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {parsedTrades.length} trades ready to import
+                      </span>
+                    </div>
+                    
+                    <div className="max-h-48 overflow-auto border border-border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Symbol</TableHead>
+                            <TableHead className="text-xs">Type</TableHead>
+                            <TableHead className="text-xs">Qty</TableHead>
+                            <TableHead className="text-xs">Entry</TableHead>
+                            <TableHead className="text-xs">Exit</TableHead>
+                            <TableHead className="text-xs">P&L</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {parsedTrades.slice(0, 5).map((trade, i) => {
+                            const pnl = (trade.exit_price - trade.entry_price) * trade.quantity * (trade.trade_type === "buy" ? 1 : -1);
+                            return (
+                              <TableRow key={i}>
+                                <TableCell className="text-xs font-medium">{trade.symbol}</TableCell>
+                                <TableCell className="text-xs capitalize">{trade.trade_type}</TableCell>
+                                <TableCell className="text-xs">{trade.quantity}</TableCell>
+                                <TableCell className="text-xs">${trade.entry_price}</TableCell>
+                                <TableCell className="text-xs">${trade.exit_price}</TableCell>
+                                <TableCell className={`text-xs ${pnl >= 0 ? "text-success" : "text-destructive"}`}>
+                                  ${pnl.toFixed(2)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {parsedTrades.length > 5 && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        Showing 5 of {parsedTrades.length} trades
+                      </p>
+                    )}
+                    
+                    <Button onClick={handleImportTrades} className="w-full">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Import {parsedTrades.length} Trades
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card className="glass-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
@@ -104,10 +374,20 @@ const Trades = () => {
         </Card>
         <Card className="glass-card">
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Win Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{winRate}%</div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total P&L</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">${trades.reduce((acc, t) => acc + t.profit, 0)}</div>
+            <div className={`text-2xl font-bold ${totalPnL >= 0 ? "text-success" : "text-destructive"}`}>
+              ${totalPnL}
+            </div>
           </CardContent>
         </Card>
       </div>
