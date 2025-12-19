@@ -190,7 +190,6 @@ const Settings = () => {
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm New Password</Label>
                 <Input 
@@ -200,7 +199,6 @@ const Settings = () => {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
-
               <Separator />
 
               <Button

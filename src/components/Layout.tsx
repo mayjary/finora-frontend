@@ -5,6 +5,7 @@ import { LayoutDashboard, TrendingUp, BarChart3, Calculator, Newspaper, Settings
 import logo from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserAuth } from "@/context/AuthContext";
 
 interface LayoutProps {
   children: ReactNode;
@@ -22,8 +23,20 @@ const navItems = [
 export const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const auth = UserAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Call Supabase sign-out if auth context is available
+    if (auth?.signOut) {
+      await auth.signOut();
+    }
+
+    // Optionally clear any client-side session state here via auth.setSession(null)
+    if (auth?.setSession) {
+      auth.setSession(null);
+    }
+
+    // Redirect to landing / login
     navigate("/");
   };
 
