@@ -8,6 +8,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Trades from "./pages/Trades";
+import Stocks from "./pages/Stocks";
 import ChartAnalyzer from "./pages/ChartAnalyzer";
 import Valuation from "./pages/Valuation";
 import News from "./pages/News";
@@ -26,6 +27,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/stocks" element={<Layout><Stocks /></Layout>} />
             <Route path="/trades" element={<Layout><Trades /></Layout>} />
             <Route path="/chart-analyzer" element={<Layout><ChartAnalyzer /></Layout>} />
             <Route path="/valuation" element={<Layout><Valuation /></Layout>} />
