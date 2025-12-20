@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Trades from "./pages/Trades";
 import Stocks from "./pages/Stocks";
 import ChartAnalyzer from "./pages/ChartAnalyzer";
+import ChartReview from "./pages/ChartReview";
 import Valuation from "./pages/Valuation";
 import News from "./pages/News";
 import Settings from "./pages/Settings";
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/stocks" element={<Layout><Stocks /></Layout>} />
             <Route path="/trades" element={<Layout><Trades /></Layout>} />
             <Route path="/chart-analyzer" element={<Layout><ChartAnalyzer /></Layout>} />
+            <Route path="/chart-review" element={<Layout><ChartReview /></Layout>} />
             <Route path="/valuation" element={<Layout><Valuation /></Layout>} />
             <Route path="/news" element={<Layout><News /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
