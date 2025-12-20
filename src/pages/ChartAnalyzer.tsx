@@ -34,14 +34,14 @@ type IndicatorMap = {
 
 const CRYPTO_SYMBOLS = ["BTC", "ETH", "SOL", "ADA", "XRP", "DOGE"];
 
-const getMarketType = (symbol: string) => {
-  if (CRYPTO_SYMBOLS.includes(symbol.toUpperCase())) {
-    return "CRYPTO";
-  }
-  return "EQUITY";
+const normalizeSymbol = (raw: string) => {
+  let s = raw.trim().toUpperCase();
+
+  if (s.includes(":")) s = s.split(":")[1];
+  if (s.endsWith("-USD")) s = s.replace("-USD", "");
+
+  return s;
 };
-
-
 
 const ChartAnalyzer = () => {
   const [symbol, setSymbol] = useState("AAPL");
@@ -51,51 +51,67 @@ const ChartAnalyzer = () => {
   const [indicators, setIndicators] = useState<IndicatorMap | null>(null);
   const [patterns, setPatterns] = useState<Record<string, boolean>>({});
   const [aiInsights, setAiInsights] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const marketType = getMarketType(symbol);  
+  const normalizedSymbol = normalizeSymbol(symbol);
+  const marketType = CRYPTO_SYMBOLS.includes(normalizedSymbol)
+    ? "CRYPTO"
+    : "EQUITY";
 
   const handleAnalyze = async () => {
     setLoading(true);
-  
+    setError(null);
+    setIndicators(null);
+    setPatterns({});
+    setAiInsights([]);
+
     try {
       const res = await fetch("http://localhost:5001/api/ai/chart-analysis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol, timeframe }),
+        body: JSON.stringify({
+          symbol: normalizedSymbol,
+          timeframe,
+        }),
       });
-  
+
       const data = await res.json();
-  
-      setIndicators(data.indicators || {});
+
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+
+      setIndicators(data.indicators || null);
       setPatterns(data.patterns || {});
       setAiInsights(data.insights || []);
     } catch (err) {
       console.error("Chart analysis failed", err);
+      setError("Analysis failed. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
-  
 
   return (
     <div className="space-y-6">
       <div>
-      <div className="flex items-center gap-3">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Chart Analyzer
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight">
+            Chart Analyzer
+          </h1>
 
-        <Badge
-          variant="outline"
-          className={
-            marketType === "CRYPTO"
-              ? "border-purple-500 text-purple-500"
-              : "border-blue-500 text-blue-500"
-          }
-        >
-          {marketType}
-        </Badge>
-      </div>
+          <Badge
+            variant="outline"
+            className={
+              marketType === "CRYPTO"
+                ? "border-purple-500 text-purple-500"
+                : "border-blue-500 text-blue-500"
+            }
+          >
+            {marketType}
+          </Badge>
+        </div>
         <p className="text-muted-foreground">
           AI-powered technical analysis and pattern recognition
         </p>
@@ -114,7 +130,10 @@ const ChartAnalyzer = () => {
               <Label>Symbol</Label>
               <Input
                 value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
+                onChange={(e) =>
+                  setSymbol(e.target.value.toUpperCase())
+                }
+                placeholder="AAPL, BTC, ETH"
               />
             </div>
 
@@ -139,7 +158,7 @@ const ChartAnalyzer = () => {
               <Button
                 className="w-full"
                 onClick={handleAnalyze}
-                disabled={loading}
+                disabled={loading || normalizedSymbol.length < 2}
               >
                 {loading ? (
                   <>
@@ -158,6 +177,14 @@ const ChartAnalyzer = () => {
         </CardContent>
       </Card>
 
+      {error && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="py-4 text-sm text-destructive">
+            {error}
+          </CardContent>
+        </Card>
+      )}
+
       {indicators && (
         <Card className="glass-card">
           <CardHeader>
@@ -166,7 +193,7 @@ const ChartAnalyzer = () => {
               Technical Indicators
             </CardTitle>
             <CardDescription>
-              Key technical indicators for {symbol}
+              Key technical indicators for {normalizedSymbol}
             </CardDescription>
           </CardHeader>
 
@@ -183,15 +210,12 @@ const ChartAnalyzer = () => {
                   </div>
                 </div>
 
-                <Badge variant="outline">
-                  {data.signal}
-                </Badge>
+                <Badge variant="outline">{data.signal}</Badge>
               </div>
             ))}
           </CardContent>
         </Card>
       )}
-
 
       {Object.keys(patterns).length > 0 && (
         <Card className="glass-card">
@@ -218,12 +242,11 @@ const ChartAnalyzer = () => {
         </Card>
       )}
 
-{!indicators && !loading && (
-  <p className="text-muted-foreground text-sm">
-    Enter a symbol and click Analyze Chart to view insights
-  </p>
-)}
-
+      {!indicators && !loading && !error && (
+        <p className="text-muted-foreground text-sm">
+          Enter a symbol and click Analyze Chart to view insights
+        </p>
+      )}
 
       {aiInsights.length > 0 && (
         <Card className="glass-card">
@@ -233,7 +256,7 @@ const ChartAnalyzer = () => {
               AI Insights
             </CardTitle>
             <CardDescription>
-              Machine learning analysis of {symbol}
+              Machine learning analysis of {normalizedSymbol}
             </CardDescription>
           </CardHeader>
 
