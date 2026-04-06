@@ -2,7 +2,7 @@
 
 This is the web app for Finora (UI + auth + charts + dashboard).
 
-- **Backend repo**: `https://github.com/<your-username>/finora-backend`
+- **Backend repo**: `https://github.com/mayjary/finora-backend`
 
 ## Tech
 
