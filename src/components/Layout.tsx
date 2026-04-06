@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, TrendingUp, BarChart3, Calculator, Newspaper, Settings, LogOut, LineChart, ImagePlus } from "lucide-react";
+import { LayoutDashboard, TrendingUp, BarChart3, Calculator, Newspaper, Settings, LogOut, LineChart, ImagePlus, Shield } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -19,6 +19,7 @@ const navItems = [
   { icon: ImagePlus, label: "Chart Review", path: "/chart-review" },
   { icon: Calculator, label: "Valuation", path: "/valuation" },
   { icon: Newspaper, label: "Market News", path: "/news" },
+  { icon: Shield, label: "Privacy Policy", path: "/privacy" },
   { icon: Settings, label: "Settings", path: "/settings" },
 ];
 

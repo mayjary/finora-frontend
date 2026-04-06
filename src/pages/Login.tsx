@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import logo from "@/assets/logo(1).png";
 import { UserAuth } from "@/context/AuthContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +16,8 @@ const Login: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   // controlled inputs
   const [email, setEmail] = useState("");
@@ -174,14 +177,58 @@ const Login: React.FC = () => {
                   />
                 </div>
 
+                <div className="space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-start space-x-2">
+                    <input
+                      id="signup-terms"
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-muted-foreground/40"
+                      checked={acceptedTerms}
+                      onChange={(e) => setAcceptedTerms(e.target.checked)}
+                      required
+                    />
+                    <Label htmlFor="signup-terms" className="space-y-1 text-xs font-normal">
+                      <span>
+                        I agree to the{" "}
+                        <button
+                          type="button"
+                          className="underline text-primary"
+                          onClick={() => setIsTermsOpen(true)}
+                        >
+                          Terms &amp; Conditions and Privacy Policy
+                        </button>
+                        .
+                      </span>
+                    </Label>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/80">
+                    You must review and accept our legal terms before creating an account.
+                  </p>
+                </div>
+
                 {error && <div className="text-sm text-red-400">{error}</div>}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button type="submit" className="w-full" disabled={isLoading || !acceptedTerms}>
                   {isLoading ? "Creating account..." : "Sign Up"}
                 </Button>
               </form>
             </TabsContent>
           </Tabs>
+
+          <Dialog open={isTermsOpen} onOpenChange={setIsTermsOpen}>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden p-0">
+              <DialogHeader className="px-6 pt-6 pb-0">
+                <DialogTitle>Terms &amp; Conditions and Privacy Policy</DialogTitle>
+              </DialogHeader>
+              <div className="mt-4 border-t border-border/60">
+                <iframe
+                  src="/terms"
+                  title="Terms and Conditions"
+                  className="h-[65vh] w-full border-0"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>

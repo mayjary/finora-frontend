@@ -15,6 +15,8 @@ import Valuation from "./pages/Valuation";
 import News from "./pages/News";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +29,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Login />} />
+            <Route path="/terms" element={<TermsAndConditions />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
             <Route path="/stocks" element={<Layout><Stocks /></Layout>} />
             <Route path="/trades" element={<Layout><Trades /></Layout>} />

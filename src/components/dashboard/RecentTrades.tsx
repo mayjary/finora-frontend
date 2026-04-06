@@ -5,14 +5,46 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const recentTrades = [
+const fallbackRecentTrades = [
   { symbol: "EUR/USD", entry: "1.0850", exit: "1.0890", profit: "+$240", type: "Long", time: "2 hours ago" },
   { symbol: "GBP/JPY", entry: "188.50", exit: "187.90", profit: "-$120", type: "Short", time: "5 hours ago" },
   { symbol: "XAU/USD", entry: "2025", exit: "2040", profit: "+$450", type: "Long", time: "1 day ago" },
 ];
 
-export const RecentTrades = () => {
+interface BackendTrade {
+  symbol: string;
+  trade_type?: string;
+  entry_price?: number;
+  exit_price?: number;
+  pnl?: number;
+  created_at?: string;
+}
+
+interface RecentTradesProps {
+  trades?: BackendTrade[];
+}
+
+export const RecentTrades = ({ trades }: RecentTradesProps) => {
   const navigate = useNavigate();
+
+  const rows =
+    trades && trades.length > 0
+      ? trades.map((t) => {
+          const isBuy = t.trade_type?.toLowerCase() === "buy";
+          const pnl = Number(t.pnl ?? 0);
+
+          return {
+            symbol: t.symbol,
+            type: isBuy ? "Long" : "Short",
+            entry: t.entry_price != null ? t.entry_price.toFixed(4) : "-",
+            exit: t.exit_price != null ? t.exit_price.toFixed(4) : "-",
+            profit: `${pnl >= 0 ? "+" : "-"}$${Math.abs(pnl).toFixed(2)}`,
+            time: t.created_at
+              ? new Date(t.created_at).toLocaleString()
+              : "",
+          };
+        })
+      : fallbackRecentTrades;
 
   return (
     <Card className="glass-card">
@@ -38,7 +70,7 @@ export const RecentTrades = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {recentTrades.map((trade, i) => (
+            {rows.map((trade, i) => (
               <TableRow key={i}>
                 <TableCell className="font-medium">{trade.symbol}</TableCell>
                 <TableCell>

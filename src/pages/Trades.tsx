@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, TrendingUp, TrendingDown, Filter, Upload, FileSpreadsheet, AlertCircle, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Papa from "papaparse";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
 
 interface Trade {
   id: number;
@@ -46,19 +48,128 @@ const Trades = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>("");
 
-  const [trades, setTrades] = useState<Trade[]>([
-    { id: 1, symbol: "AAPL", type: "buy", quantity: 10, price: 182.50, date: "2024-01-15", profit: 250, status: "open" },
-    { id: 2, symbol: "TSLA", type: "sell", quantity: 5, price: 238.75, date: "2024-01-14", profit: -120, status: "closed" },
-    { id: 3, symbol: "MSFT", type: "buy", quantity: 15, price: 412.30, date: "2024-01-13", profit: 450, status: "closed" },
-    { id: 4, symbol: "GOOGL", type: "buy", quantity: 8, price: 141.80, date: "2024-01-12", profit: 180, status: "open" },
-    { id: 5, symbol: "AMZN", type: "sell", quantity: 12, price: 175.25, date: "2024-01-11", profit: -95, status: "closed" },
-  ]);
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [manualSymbol, setManualSymbol] = useState<string>("");
+  const [manualType, setManualType] = useState<"buy" | "sell">("buy");
+  const [manualQuantity, setManualQuantity] = useState<string>("");
+  const [manualPrice, setManualPrice] = useState<string>("");
+  const [manualExitPrice, setManualExitPrice] = useState<string>("");
 
-  const handleAddTrade = () => {
-    toast({
-      title: "Trade Added",
-      description: "Your trade has been successfully recorded.",
-    });
+  useEffect(() => {
+    const fetchTrades = async () => {
+      try {
+        setIsLoading(true);
+  
+        const res = await fetch(`${API_BASE_URL}/api/trades`);
+  
+        const data = await res.json();
+  
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to load trades");
+        }
+  
+        const mappedTrades: Trade[] = (data || []).map(
+          (t: any, index: number) => ({
+            id: index + 1,
+            symbol: t.symbol,
+            type: t.trade_type,
+            quantity: Number(t.quantity),
+            price: Number(t.entry_price),
+            exitPrice:
+              t.exit_price != null ? Number(t.exit_price) : undefined,
+            date: t.entry_time,
+            exitDate: t.exit_time ?? undefined,
+            profit: Number(t.pnl),
+            status: t.exit_time ? "closed" : "open",
+          })
+        );
+  
+        setTrades(mappedTrades);
+      } catch (error: any) {
+        console.error(error);
+        toast({
+          title: "Error loading trades",
+          description: error.message,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    fetchTrades();
+  }, [toast]);
+
+  const handleAddTrade = async () => {
+    if (!manualSymbol || !manualQuantity || !manualPrice) {
+      toast({
+        title: "Missing fields",
+        description: "Please provide symbol, quantity, and price.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const now = new Date().toISOString();
+      const body = {
+        user_id: "demo-user",
+        symbol: manualSymbol,
+        trade_type: manualType,
+        quantity: Number(manualQuantity),
+        entry_price: Number(manualPrice),
+        exit_price: manualExitPrice ? Number(manualExitPrice) : Number(manualPrice),
+        entry_time: now,
+        exit_time: now,
+      };
+
+      const res = await fetch(`${API_BASE_URL}/api/trades/manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to add trade");
+      }
+
+      const saved = await res.json();
+
+      const newTrade: Trade = {
+        id: trades.length + 1,
+        symbol: saved.symbol,
+        type: saved.trade_type,
+        quantity: Number(saved.quantity),
+        price: Number(saved.entry_price),
+        exitPrice: saved.exit_price != null ? Number(saved.exit_price) : undefined,
+        date: saved.entry_time,
+        exitDate: saved.exit_time ?? undefined,
+        profit: Number(saved.pnl),
+        status: saved.exit_time ? "closed" : "open",
+      };
+
+      setTrades([newTrade, ...trades]);
+      setManualSymbol("");
+      setManualType("buy");
+      setManualQuantity("");
+      setManualPrice("");
+      setManualExitPrice("");
+
+      toast({
+        title: "Trade Added",
+        description: "Your trade has been successfully recorded.",
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error adding trade",
+        description: "Could not save trade to the server.",
+        variant: "destructive",
+      });
+    }
   };
 
   const validateCSV = (data: any[]): { valid: boolean; errors: string[] } => {
@@ -103,7 +214,12 @@ const Trades = () => {
             quantity: parseInt(row.quantity) || 0,
             entry_time: row.entry_time || "",
             exit_time: row.exit_time || "",
-            trade_type: row.trade_type?.toLowerCase() || "buy",
+            trade_type:
+              row.trade_type?.toLowerCase() === "short"
+                ? "sell"
+                : row.trade_type?.toLowerCase() === "long"
+                ? "buy"
+                : row.trade_type?.toLowerCase() || "buy",
           }));
 
           setParsedTrades(parsed);
@@ -150,35 +266,63 @@ const Trades = () => {
     }
   };
 
-  const handleImportTrades = () => {
-    const newTrades: Trade[] = parsedTrades.map((pt, index) => ({
-      id: trades.length + index + 1,
-      symbol: pt.symbol,
-      type: pt.trade_type as "buy" | "sell",
-      quantity: pt.quantity,
-      price: pt.entry_price,
-      exitPrice: pt.exit_price,
-      date: pt.entry_time,
-      exitDate: pt.exit_time,
-      profit: (pt.exit_price - pt.entry_price) * pt.quantity * (pt.trade_type === "buy" ? 1 : -1),
-      status: "closed" as const,
-    }));
+  const handleImportTrades = async () => {
+    if (parsedTrades.length === 0) {
+      return;
+    }
 
-    setTrades([...trades, ...newTrades]);
-    setParsedTrades([]);
-    setFileName("");
-    
-    toast({
-      title: "Trades Imported",
-      description: `Successfully imported ${newTrades.length} trades.`,
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/trades/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: "demo-user",
+          trades: parsedTrades,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to import trades");
+      }
+
+      const data = await res.json();
+
+      const newTrades: Trade[] = (data.trades || []).map((t: any, index: number) => ({
+        id: trades.length + index + 1,
+        symbol: t.symbol,
+        type: t.trade_type,
+        quantity: Number(t.quantity),
+        price: Number(t.entry_price),
+        exitPrice: t.exit_price != null ? Number(t.exit_price) : undefined,
+        date: t.entry_time,
+        exitDate: t.exit_time ?? undefined,
+        profit: Number(t.pnl),
+        status: t.exit_time ? "closed" : "open",
+      }));
+
+      setTrades([...newTrades, ...trades]);
+      setParsedTrades([]);
+      setFileName("");
+
+      toast({
+        title: "Trades Imported",
+        description: `Successfully imported ${newTrades.length} trades.`,
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error importing trades",
+        description: "Could not import trades to the server.",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredTrades = trades.filter(trade => 
     filterType === "all" ? true : trade.status === filterType
   );
 
-  const totalPnL = trades.reduce((acc, t) => acc + t.profit, 0);
+  const totalPnL = Math.round(trades.reduce((acc, t) => acc + t.profit, 0) * 100) / 100;
   const winningTrades = trades.filter(t => t.profit > 0).length;
   const winRate = trades.length > 0 ? ((winningTrades / trades.length) * 100).toFixed(1) : "0";
 
@@ -217,11 +361,16 @@ const Trades = () => {
               <TabsContent value="manual" className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="symbol">Symbol</Label>
-                  <Input id="symbol" placeholder="e.g., AAPL" />
+                  <Input
+                    id="symbol"
+                    placeholder="e.g., AAPL"
+                    value={manualSymbol}
+                    onChange={(e) => setManualSymbol(e.target.value.toUpperCase())}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="type">Type</Label>
-                  <Select>
+                  <Select value={manualType} onValueChange={(v) => setManualType(v as "buy" | "sell")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -233,11 +382,33 @@ const Trades = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="quantity">Quantity</Label>
-                  <Input id="quantity" type="number" placeholder="0" />
+                  <Input
+                    id="quantity"
+                    type="number"
+                    placeholder="0"
+                    value={manualQuantity}
+                    onChange={(e) => setManualQuantity(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="price">Price</Label>
-                  <Input id="price" type="number" placeholder="0.00" />
+                  <Input
+                    id="price"
+                    type="number"
+                    placeholder="0.00"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="exitPrice">Exit Price (optional)</Label>
+                  <Input
+                    id="exitPrice"
+                    type="number"
+                    placeholder="0.00"
+                    value={manualExitPrice}
+                    onChange={(e) => setManualExitPrice(e.target.value)}
+                  />
                 </div>
                 <DialogFooter>
                   <Button onClick={handleAddTrade}>Add Trade</Button>
@@ -361,7 +532,9 @@ const Trades = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Trades</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{trades.length}</div>
+            <div className="text-2xl font-bold">
+              {isLoading ? "…" : trades.length}
+            </div>
           </CardContent>
         </Card>
         <Card className="glass-card">
@@ -386,7 +559,15 @@ const Trades = () => {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalPnL >= 0 ? "text-success" : "text-destructive"}`}>
-              ${totalPnL}
+              {totalPnL < 0
+                ? `-$${Math.abs(totalPnL).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`
+                : `$${totalPnL.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`}
             </div>
           </CardContent>
         </Card>
@@ -441,7 +622,9 @@ const Trades = () => {
                   <div className="text-right">
                     <div className="text-sm text-muted-foreground">P&L</div>
                     <div className={`font-medium ${trade.profit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                      ${Math.abs(trade.profit)}
+                    {trade.profit < 0
+                      ? `-$${Math.abs(trade.profit).toFixed(2)}`
+                      : `$${trade.profit.toFixed(2)}`}
                     </div>
                   </div>
                   <Badge variant={trade.status === 'open' ? 'default' : 'secondary'}>
