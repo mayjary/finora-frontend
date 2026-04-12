@@ -80,7 +80,9 @@ const getCategory = (
 };
 
 const getSentimentColor = (sentiment: string) => {
-  switch (sentiment) {
+  const s = sentiment?.toLowerCase().trim();
+
+  switch (s) {
     case "positive":
       return "bg-success/10 text-success border-success/20";
     case "negative":

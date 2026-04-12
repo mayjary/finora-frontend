@@ -6,6 +6,7 @@ import logo from "@/assets/logo.png";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserAuth } from "@/context/AuthContext";
+import { DimonChat } from "@/components/DimonChat";
 
 interface LayoutProps {
   children: ReactNode;
@@ -84,10 +85,11 @@ export const Layout = ({ children }: LayoutProps) => {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
+      <main className="relative flex-1 overflow-auto">
         <div className="container mx-auto p-6">
           {children}
         </div>
+        <DimonChat />
       </main>
     </div>
   );

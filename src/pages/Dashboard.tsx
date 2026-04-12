@@ -12,6 +12,7 @@ import { AIInsightsPanel } from "@/components/dashboard/AIInsightsPanel";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { RecentTrades } from "@/components/dashboard/RecentTrades";
 
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
 
@@ -46,6 +47,7 @@ const Dashboard = () => {
   const [performanceData, setPerformanceData] = useState<PerformanceItem[]>([]);
   const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [allTrades, setAllTrades] = useState<Trade[]>([]);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -78,6 +80,7 @@ const Dashboard = () => {
         const tradesData = await tradesRes.json();
         if (tradesRes.ok) {
           setRecentTrades(tradesData.slice(0, 5));
+          setAllTrades(tradesData);
         }
 
       } catch (err) {
@@ -169,7 +172,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <AIInsightsPanel />
+        <AIInsightsPanel trades={allTrades} />
       </div>
 
       <RecentTrades trades={recentTrades} />

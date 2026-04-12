@@ -11,11 +11,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, TrendingUp, TrendingDown, Filter, Upload, FileSpreadsheet, AlertCircle, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Papa from "papaparse";
+import { UserAuth } from "@/context/AuthContext";
+import { Trash } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001";
 
 interface Trade {
-  id: number;
+  id: string;
   symbol: string;
   type: "buy" | "sell";
   quantity: number;
@@ -56,6 +58,19 @@ const Trades = () => {
   const [manualPrice, setManualPrice] = useState<string>("");
   const [manualExitPrice, setManualExitPrice] = useState<string>("");
 
+  const { session } = UserAuth();
+  const user = session?.user;
+
+  useEffect(() => {
+    if (user) {
+      console.log("USER ID:", user.id);
+    } else {
+      console.log("NO USER LOGGED IN");
+    }
+  }, [user]);
+
+  console.log("USER ID:", user?.id);
+
   useEffect(() => {
     const fetchTrades = async () => {
       try {
@@ -70,8 +85,8 @@ const Trades = () => {
         }
   
         const mappedTrades: Trade[] = (data || []).map(
-          (t: any, index: number) => ({
-            id: index + 1,
+          (t: any) => ({
+            id: t.id,
             symbol: t.symbol,
             type: t.trade_type,
             quantity: Number(t.quantity),
@@ -114,7 +129,7 @@ const Trades = () => {
     try {
       const now = new Date().toISOString();
       const body = {
-        user_id: "demo-user",
+        user_id: user?.id,
         symbol: manualSymbol,
         trade_type: manualType,
         quantity: Number(manualQuantity),
@@ -130,16 +145,14 @@ const Trades = () => {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to add trade");
-      }
-
       const saved = await res.json();
 
+      if (!res.ok) {
+        throw new Error(saved.error || "Failed to add trade");
+      } 
+
       const newTrade: Trade = {
-        id: trades.length + 1,
+        id: saved.id,
         symbol: saved.symbol,
         type: saved.trade_type,
         quantity: Number(saved.quantity),
@@ -276,7 +289,7 @@ const Trades = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: "demo-user",
+          user_id: user?.id,
           trades: parsedTrades,
         }),
       });
@@ -288,7 +301,7 @@ const Trades = () => {
       const data = await res.json();
 
       const newTrades: Trade[] = (data.trades || []).map((t: any, index: number) => ({
-        id: trades.length + index + 1,
+        id: t.id,
         symbol: t.symbol,
         type: t.trade_type,
         quantity: Number(t.quantity),
@@ -321,6 +334,40 @@ const Trades = () => {
   const filteredTrades = trades.filter(trade => 
     filterType === "all" ? true : trade.status === filterType
   );
+
+  const handleDeleteTrade = async (id: string) => {
+    try {
+      if (!confirm("Delete this trade?")) return;
+  
+      const res = await fetch(`${API_BASE_URL}/api/trades/${id}`, {
+        method: "DELETE",
+      });
+  
+      const data = await res.json();
+  
+      if (!res.ok) {
+        throw new Error(data.error);
+      }
+  
+      console.log("Deleted:", data);
+  
+      // remove from UI
+      setTrades((prev) => prev.filter((t) => t.id !== id));
+  
+      toast({
+        title: "Deleted",
+        description: "Trade removed from database",
+      });
+  
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const totalPnL = Math.round(trades.reduce((acc, t) => acc + t.profit, 0) * 100) / 100;
   const winningTrades = trades.filter(t => t.profit > 0).length;
@@ -630,6 +677,12 @@ const Trades = () => {
                   <Badge variant={trade.status === 'open' ? 'default' : 'secondary'}>
                     {trade.status}
                   </Badge>
+                  <div
+                    className="p-2 rounded-lg hover:bg-destructive/10 cursor-pointer transition"
+                    onClick={() => handleDeleteTrade(trade.id)}
+                  >
+                    <Trash className="h-4 w-4 text-destructive" />
+                  </div>
                 </div>
               </div>
             ))}
